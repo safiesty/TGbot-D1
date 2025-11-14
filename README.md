@@ -55,6 +55,33 @@
     | `config` | `key` (TEXT, PRIMARY KEY), `value` (TEXT) |
     | `messages` | `user_id` (TEXT), `message_id` (TEXT), `text` (TEXT), `date` (INTEGER), PRIMARY KEY (`user_id`, `message_id`) |
 
+    -- ① users 表
+CREATE TABLE IF NOT EXISTS users (
+    user_id TEXT PRIMARY KEY,
+    topic_id TEXT,
+    user_state TEXT,
+    is_blocked INTEGER,
+    block_count INTEGER,
+    user_info_json TEXT
+);
+
+-- ② config 表
+CREATE TABLE IF NOT EXISTS config (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
+
+-- ③ messages 表
+CREATE TABLE IF NOT EXISTS messages (
+    user_id TEXT,
+    message_id TEXT,
+    text TEXT,
+    date INTEGER,
+    PRIMARY KEY (user_id, message_id)
+);
+
+如果表格不太好理解，可以分别复制这三段表格的代码内容
+
 ### 步骤二：创建 Worker 服务并部署代码
 
 1.  导航到 **Workers 和 Pages**。
