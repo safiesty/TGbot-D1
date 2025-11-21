@@ -620,22 +620,17 @@ async function ensureBlockLogTopicExists(env) {
   
         // --- [转发内容过滤检查] ---
         const filters = {
-            // 图片/视频/文件 (原 enable_image_forwarding)
+            // 媒体类型
             media: (await getConfig('enable_image_forwarding', env, 'true')).toLowerCase() === 'true',
-            // 链接
             link: (await getConfig('enable_link_forwarding', env, 'true')).toLowerCase() === 'true',
-            // 纯文本
             text: (await getConfig('enable_text_forwarding', env, 'true')).toLowerCase() === 'true',
-            // 频道转发 (细分)
-            channel_forward: (await getConfig('enable_channel_forwarding', env, 'true')).toLowerCase() === 'true', 
-            
-            // 新增过滤器
-            // 任何转发消息 (用户/群组/频道)
-            any_forward: (await getConfig('enable_forward_forwarding', env, 'true')).toLowerCase() === 'true', 
-            // 音频文件和语音消息
             audio_voice: (await getConfig('enable_audio_forwarding', env, 'true')).toLowerCase() === 'true', 
-            // 贴纸，emojy，gif (sticker, animation)
             sticker_gif: (await getConfig('enable_sticker_forwarding', env, 'true')).toLowerCase() === 'true', 
+            
+            // [⭐️ 新增/修改] 三种细分的转发类型
+            user_forward: (await getConfig('enable_user_forwarding', env, 'true')).toLowerCase() === 'true', // 用户转发
+            group_forward: (await getConfig('enable_group_forwarding', env, 'true')).toLowerCase() === 'true', // 群组转发
+            channel_forward: (await getConfig('enable_channel_forwarding', env, 'true')).toLowerCase() === 'true', // 频道转发
         };
   
         let isForwardable = true;
@@ -646,19 +641,28 @@ async function ensureBlockLogTopicExists(env) {
             return entities.some(entity => entity.type === 'url' || entity.type === 'text_link');
         };
   
-        // 1. 任何转发消息（用户、群组、频道）
-        if (message.forward_from || message.forward_from_chat) {
-             // 检查总开关
-             if (!filters.any_forward) {
+        // 1. [⭐️ 修改逻辑] 细分转发类型检查
+        if (message.forward_from) {
+            // 来自“用户”的转发 (forward_from 存在即为用户)
+            if (!filters.user_forward) {
                 isForwardable = false;
-                filterReason = '转发消息 (来自用户/群组/频道)';
-            } 
-            // 如果总开关允许，但它是频道转发，再检查频道细分开关
-            else if (message.forward_from_chat && message.forward_from_chat.type === 'channel' && !filters.channel_forward) {
-                isForwardable = false;
-                filterReason = '频道转发消息';
+                filterReason = '用户转发消息';
             }
-        } 
+        } else if (message.forward_from_chat) {
+            // 来自“对话”的转发 (频道 或 群组)
+            const type = message.forward_from_chat.type;
+            if (type === 'channel') {
+                if (!filters.channel_forward) {
+                    isForwardable = false;
+                    filterReason = '频道转发消息';
+                }
+            } else if (type === 'group' || type === 'supergroup') {
+                if (!filters.group_forward) {
+                    isForwardable = false;
+                    filterReason = '群组转发消息';
+                }
+            }
+        }
         // 2. 音频文件和语音消息
         else if (message.audio || message.voice) {
             if (!filters.audio_voice) {
@@ -1255,67 +1259,73 @@ async function ensureBlockLogTopicExists(env) {
 * 按类型过滤子菜单 - 兼容编辑和发送新消息
 */
 async function handleAdminTypeBlockMenu(chatId, messageId, env) {
-  // 获取当前状态，检查 D1 -> ENV -> 默认值 'true'
-  const mediaStatus = (await getConfig('enable_image_forwarding', env, 'true')).toLowerCase() === 'true'; // 图片/视频/文件
-  const linkStatus = (await getConfig('enable_link_forwarding', env, 'true')).toLowerCase() === 'true';
-  const textStatus = (await getConfig('enable_text_forwarding', env, 'true')).toLowerCase() === 'true';
-  const channelForwardStatus = (await getConfig('enable_channel_forwarding', env, 'true')).toLowerCase() === 'true'; // 频道转发
-  const anyForwardStatus = (await getConfig('enable_forward_forwarding', env, 'true')).toLowerCase() === 'true'; // 任何转发
-  const audioVoiceStatus = (await getConfig('enable_audio_forwarding', env, 'true')).toLowerCase() === 'true'; // 音频/语音
-  const stickerGifStatus = (await getConfig('enable_sticker_forwarding', env, 'true')).toLowerCase() === 'true'; // 贴纸/GIF
-
-  const statusToText = (status) => status ? "✅ 允许" : "❌ 屏蔽";
-  // 构造回调数据：config:toggle:key:new_value
-  const statusToCallback = (key, status) => `config:toggle:${key}:${status ? 'false' : 'true'}`;
-
-  // [⭐️ 修改点 1] 文本中添加序号列
-  const menuText = `
-🔗 <b>按类型过滤管理</b>
-点击下方对应序号的按钮切换状态 (切换后立即生效)。
-
-| 序号 | 类型 | 状态 |
-| :--- | :--- | :--- |
-| 1 | <b>转发消息（用户/群组/频道）</b>| ${statusToText(anyForwardStatus)} |
-| 2 | 频道转发消息 (细分) | ${statusToText(channelForwardStatus)} |
-| 3 | <b>音频/语音消息</b> | ${statusToText(audioVoiceStatus)} |
-| 4 | <b>贴纸/GIF (动画)</b> | ${statusToText(stickerGifStatus)} |
-| 5 | 图片/视频/文件 | ${statusToText(mediaStatus)} |
-| 6 | 链接消息 | ${statusToText(linkStatus)} |
-| 7 | 纯文本消息 | ${statusToText(textStatus)} |
-  `.trim();
-
-  // [⭐️ 修改点 2] 按钮文字前添加对应的序号 (例如 "1. ✅ 允许")
-  const menuKeyboard = {
-      inline_keyboard: [
-          [
-              { text: `1. ${statusToText(anyForwardStatus)}`, callback_data: statusToCallback('enable_forward_forwarding', anyForwardStatus) },
-              { text: `2. ${statusToText(channelForwardStatus)}`, callback_data: statusToCallback('enable_channel_forwarding', channelForwardStatus) }
-          ],
-          [
-              { text: `3. ${statusToText(audioVoiceStatus)}`, callback_data: statusToCallback('enable_audio_forwarding', audioVoiceStatus) },
-              { text: `4. ${statusToText(stickerGifStatus)}`, callback_data: statusToCallback('enable_sticker_forwarding', stickerGifStatus) }
-          ],
-          [
-              { text: `5. ${statusToText(mediaStatus)}`, callback_data: statusToCallback('enable_image_forwarding', mediaStatus) },
-              { text: `6. ${statusToText(linkStatus)}`, callback_data: statusToCallback('enable_link_forwarding', linkStatus) }
-          ],
-          [{ text: `7. ${statusToText(textStatus)}`, callback_data: statusToCallback('enable_text_forwarding', textStatus) }],
-          [{ text: "⬅️ 返回主菜单", callback_data: "config:menu" }],
-      ]
-  };
-
-  const apiMethod = (messageId && messageId !== 0) ? "editMessageText" : "sendMessage";
-  const params = {
-      chat_id: chatId,
-      text: menuText,
-      parse_mode: "HTML",
-      reply_markup: menuKeyboard,
-  };
-  if (apiMethod === "editMessageText") {
-      params.message_id = messageId;
+    // 获取当前状态
+    const mediaStatus = (await getConfig('enable_image_forwarding', env, 'true')).toLowerCase() === 'true'; 
+    const linkStatus = (await getConfig('enable_link_forwarding', env, 'true')).toLowerCase() === 'true';
+    const textStatus = (await getConfig('enable_text_forwarding', env, 'true')).toLowerCase() === 'true';
+    const audioVoiceStatus = (await getConfig('enable_audio_forwarding', env, 'true')).toLowerCase() === 'true';
+    const stickerGifStatus = (await getConfig('enable_sticker_forwarding', env, 'true')).toLowerCase() === 'true';
+    
+    // [⭐️ 新增] 获取三个细分的转发状态
+    const userForwardStatus = (await getConfig('enable_user_forwarding', env, 'true')).toLowerCase() === 'true'; // 用户
+    const groupForwardStatus = (await getConfig('enable_group_forwarding', env, 'true')).toLowerCase() === 'true'; // 群组
+    const channelForwardStatus = (await getConfig('enable_channel_forwarding', env, 'true')).toLowerCase() === 'true'; // 频道
+  
+    const statusToText = (status) => status ? "✅ 允许" : "❌ 屏蔽";
+    const statusToCallback = (key, status) => `config:toggle:${key}:${status ? 'false' : 'true'}`;
+  
+    // [⭐️ 修改] 更新表格说明，增加到 8 项
+    const menuText = `
+  🔗 <b>按类型过滤管理</b>
+  点击下方对应序号的按钮切换状态 (切换后立即生效)。
+  
+  | 序号 | 类型 | 状态 |
+  | :--- | :--- | :--- |
+  | 1 | <b>转发消息 (来自用户)</b> | ${statusToText(userForwardStatus)} |
+  | 2 | <b>转发消息 (来自群组)</b> | ${statusToText(groupForwardStatus)} |
+  | 3 | <b>转发消息 (来自频道)</b> | ${statusToText(channelForwardStatus)} |
+  | 4 | 音频/语音消息 | ${statusToText(audioVoiceStatus)} |
+  | 5 | 贴纸/GIF (动画) | ${statusToText(stickerGifStatus)} |
+  | 6 | 图片/视频/文件 | ${statusToText(mediaStatus)} |
+  | 7 | 链接消息 | ${statusToText(linkStatus)} |
+  | 8 | 纯文本消息 | ${statusToText(textStatus)} |
+    `.trim();
+  
+    // [⭐️ 修改] 更新按钮布局，对应上方序号
+    const menuKeyboard = {
+        inline_keyboard: [
+            [
+                { text: `1. ${statusToText(userForwardStatus)}`, callback_data: statusToCallback('enable_user_forwarding', userForwardStatus) },
+                { text: `2. ${statusToText(groupForwardStatus)}`, callback_data: statusToCallback('enable_group_forwarding', groupForwardStatus) }
+            ],
+            [
+                { text: `3. ${statusToText(channelForwardStatus)}`, callback_data: statusToCallback('enable_channel_forwarding', channelForwardStatus) },
+                { text: `4. ${statusToText(audioVoiceStatus)}`, callback_data: statusToCallback('enable_audio_forwarding', audioVoiceStatus) }
+            ],
+            [
+                { text: `5. ${statusToText(stickerGifStatus)}`, callback_data: statusToCallback('enable_sticker_forwarding', stickerGifStatus) },
+                { text: `6. ${statusToText(mediaStatus)}`, callback_data: statusToCallback('enable_image_forwarding', mediaStatus) }
+            ],
+            [
+                { text: `7. ${statusToText(linkStatus)}`, callback_data: statusToCallback('enable_link_forwarding', linkStatus) },
+                { text: `8. ${statusToText(textStatus)}`, callback_data: statusToCallback('enable_text_forwarding', textStatus) }
+            ],
+            [{ text: "⬅️ 返回主菜单", callback_data: "config:menu" }],
+        ]
+    };
+  
+    const apiMethod = (messageId && messageId !== 0) ? "editMessageText" : "sendMessage";
+    const params = {
+        chat_id: chatId,
+        text: menuText,
+        parse_mode: "HTML",
+        reply_markup: menuKeyboard,
+    };
+    if (apiMethod === "editMessageText") {
+        params.message_id = messageId;
+    }
+    await telegramApi(env.BOT_TOKEN, apiMethod, params);
   }
-  await telegramApi(env.BOT_TOKEN, apiMethod, params);
-}
   
   
   /**
